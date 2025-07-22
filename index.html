@@ -351,6 +351,8 @@
         <div id="gif2Status">2.gif (7.5MB): <span class="loading-status">Loading...</span></div>
         <div id="totalNetworkUsage">Network Used: <span id="networkUsed">0 MB</span></div>
         <div id="loadingProgress">Progress: <span id="progress">0%</span></div>
+        <div id="cacheStatus">Cache Status: <span id="cacheInfo">Detecting...</span></div>
+        <button id="clearCacheBtn" style="margin-top: 10px; padding: 5px 10px; background: #ff3333; color: white; border: none; border-radius: 4px; cursor: pointer;">🗑️ Force Reload (No Cache)</button>
     </div>
 
     <script>
@@ -365,6 +367,8 @@
         
         let loadedResources = 0;
         const totalResources = 2; // 2 GIFs to track
+        let testNumber = parseInt(localStorage.getItem('testNumber') || '0') + 1;
+        localStorage.setItem('testNumber', testNumber.toString());
 
         function updateNetworkUsage(bytes) {
             totalBytesLoaded += bytes;
@@ -374,6 +378,31 @@
         function updateProgress() {
             const progress = Math.round((loadedResources / totalResources) * 100);
             document.getElementById('progress').textContent = progress + '%';
+        }
+
+        function detectCacheStatus() {
+            const navigationEntry = performance.getEntriesByType('navigation')[0];
+            if (navigationEntry) {
+                const isFromCache = navigationEntry.transferSize === 0 && navigationEntry.decodedBodySize > 0;
+                const cacheInfo = document.getElementById('cacheInfo');
+                if (isFromCache) {
+                    cacheInfo.innerHTML = '<span style="color: orange;">⚡ From Cache</span>';
+                } else {
+                    cacheInfo.innerHTML = '<span style="color: #00ff00;">🌐 Fresh Load</span>';
+                }
+            }
+        }
+
+        function forceReloadWithoutCache() {
+            // Clear localStorage test number
+            localStorage.removeItem('testNumber');
+            // Force reload without cache
+            window.location.reload(true);
+        }
+
+        // Add cache busting to GIF URLs
+        function getCacheBustedUrl(url) {
+            return url + '?t=' + Date.now() + '&test=' + testNumber;
         }
 
         // Monitor 1.gif loading
@@ -394,7 +423,7 @@
             updateProgress();
         };
         
-        gif1.src = './1.gif';
+        gif1.src = getCacheBustedUrl('./1.gif');
 
         // Monitor 2.gif loading
         const gif2 = new Image();
@@ -414,15 +443,23 @@
             updateProgress();
         };
         
-        gif2.src = './2.gif';
+        gif2.src = getCacheBustedUrl('./2.gif');
 
         // Monitor page load time
         window.addEventListener('load', function() {
             const pageLoadTime = ((performance.now() - startTime) / 1000).toFixed(2);
-            document.getElementById('pageLoadTime').innerHTML = `Page Load: <span class="loaded-status">✓ ${pageLoadTime}s</span>`;
+            document.getElementById('pageLoadTime').innerHTML = `Page Load: <span class="loaded-status">✓ ${pageLoadTime}s (Test #${testNumber})</span>`;
             
             // Add initial static resource sizes
             updateNetworkUsage(fileSizes['font'] + fileSizes['html']);
+            
+            // Detect cache status
+            detectCacheStatus();
+        });
+
+        // Add event listener for cache clear button
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('clearCacheBtn').addEventListener('click', forceReloadWithoutCache);
         });
 
         // Add network monitoring using Performance API
